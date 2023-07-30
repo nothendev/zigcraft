@@ -21,4 +21,4 @@ pub const NextState = enum(u2) {
     }
 };
 
-pub const Handshake = helpers.Packet(struct { protocol_version: base.VarInt, next_state: NextState });
+pub const Handshake = helpers.Packet(struct { protocol_version: base.VarI32, next_state: NextState });

@@ -1,4 +1,5 @@
 const base = @import("./base.zig");
+const vi = @import("./varint.zig");
 const s = @import("std");
 const b = s.builtin;
 
@@ -13,8 +14,8 @@ pub fn serialize(comptime T: type, real: T, allocator: s.mem.Allocator) !s.Array
         .Bool => arrayList(&[_]u8{if (@as(bool, real)) 0x1 else 0x0}, allocator),
         .Int, .Float => arrayList(s.mem.asBytes(&real), allocator),
         else => switch (T) {
-            (base.VarI32) => base.VarI32.serialize(@as(base.VarI32, real), allocator),
-            (base.VarI64) => base.VarI64.serialize(@as(base.VarI64, real), allocator),
+            (vi.VarI32) => vi.VarI32.serialize(@as(vi.VarI32, real), allocator),
+            (vi.VarI64) => vi.VarI64.serialize(@as(vi.VarI64, real), allocator),
             else => {
                 if (@hasDecl(T, "zcSerialize")) {
                     return try real.zcSerialize(real, allocator);
@@ -36,7 +37,7 @@ pub fn deserialize(comptime T: type, data: []const u8, allocator: s.mem.Allocato
         },
         .Int, .Float => s.mem.bytesAsValue(T, data[0..@sizeOf(T)]).*,
         else => switch (T) {
-            base.VarI32, base.VarI64 => |varint| {
+            vi.VarI32, vi.VarI64 => |varint| {
                 return try varint.deserialize(bytes);
             },
             else => {
