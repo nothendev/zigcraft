@@ -27,19 +27,20 @@ pub fn serialize(comptime T: type, real: T, allocator: s.mem.Allocator) !s.Array
 pub const DeserializeError = error{InvalidData};
 
 pub fn deserialize(comptime T: type, data: []const u8, allocator: s.mem.Allocator) !T {
+    var bytes = data;
     return switch (@typeInfo(T)) {
-        .Bool => switch (data[0]) {
+        .Bool => switch (bytes[0]) {
             0x0 => false,
             0x1 => true,
             else => DeserializeError.InvalidData,
         },
-        .Int, .Float => s.mem.bytesToValue(T, data),
+        .Int, .Float => s.mem.bytesAsValue(T, data[0..@sizeOf(T)]).*,
         else => switch (T) {
             base.VarI32, base.VarI64 => |varint| {
-                return try varint.deserialize(data);
+                return try varint.deserialize(bytes);
             },
             else => {
-                if (@hasDecl(T, "zcDeserialize")) return try T.zcDeserialize(data, allocator) else @compileError("unsupported type!");
+                if (@hasDecl(T, "zcDeserialize")) return try T.zcDeserialize(bytes, allocator) else @compileError("unsupported type!");
             },
         },
     };

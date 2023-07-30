@@ -7,25 +7,30 @@ pub const ProtocolError = error{
     VarIntTooBig,
 };
 
-const segment_bits: i32 = 0x7F;
-const continue_bit: i32 = 0x80;
+const segment_bits: u8 = 0x7F;
+const continue_bit: u8 = 0x80;
 
-fn varintDeserializeInner(comptime T: type, byte: u8, current: struct { value: T, position: u32 }, max_position: u32) !struct { value: T, position: u32, do_continue: ?void } {
+fn varintDeserializeInner(comptime T: type, byte: u8, current: folder(T), max_position: u32) !struct { value: T, position: u32, do_continue: ?void } {
     if (current.position + 7 >= max_position) return ProtocolError.VarIntTooBig;
     return .{
-        .value = @as(T, current.value | (byte & @intCast(u8, segment_bits))),
+        .value = @as(T, (current.value | (byte & segment_bits)) << current.position),
         .position = current.position + 7,
         .do_continue = if ((byte & continue_bit) == 0) null else {},
     };
 }
 
+fn folder(comptime T: type) type {
+    return struct { value: T, position: u32 };
+}
+
 fn varintDeserialize(comptime T: type, slc: []const u8) !T {
-    var data = .{ .value = @as(T, 0), .position = 0 };
+    var data = folder(T){ .value = @as(T, 0), .position = 0 };
     for (slc) |item| {
         const next = try varintDeserializeInner(T, item, data, if (T == i32) 32 else 64);
-        data = .{ .value = next.value, .position = next.position };
-        if (next.do_continue) {} else break;
+        data = folder(T){ .value = next.value, .position = next.position };
+        next.do_continue orelse break;
     }
+    return data.value;
 }
 
 pub const VarI32 = makeVarInt(i32);
@@ -68,7 +73,7 @@ fn makeVarInt(comptime T: type) type {
                     break;
                 }
 
-                try result.append(@intCast(u8, (value & @intCast(T, segment_bits)) | @intCast(T, continue_bit)));
+                try result.append(@intCast(u8, (value & segment_bits) | continue_bit));
 
                 value = unsignedRightShift(T, value, 7);
             }
@@ -77,7 +82,7 @@ fn makeVarInt(comptime T: type) type {
         }
 
         pub fn deserialize(buffer: []const u8) !Self {
-            return .{
+            return Self{
                 .value = try varintDeserialize(T, buffer),
             };
         }
