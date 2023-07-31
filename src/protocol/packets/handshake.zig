@@ -15,6 +15,7 @@ pub const Handshake = packed struct {
 
     pub fn zcDeserialize(data: []const u8) !@This() {
         const protocol_version = try VarI32.deserialize(data);
+        const next_state = @intToEnum(NextState, @bitCast(u2, data[protocol_version.len .. protocol_version.len + 2]));
     }
 };
 
