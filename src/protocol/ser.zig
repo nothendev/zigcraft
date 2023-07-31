@@ -9,20 +9,29 @@ fn arrayList(fal: []const u8, allocator: s.mem.Allocator) !s.ArrayList(u8) {
     return al;
 }
 
+pub fn toArrayList(thimg: anytype, allocator: s.mem.Allocator) !s.ArrayList(u8) {
+    return switch (@TypeOf(thimg)) {
+        s.ArrayList(u8) => thimg,
+        []u8 => s.ArrayList(u8).fromOwnedSlice(allocator, thimg),
+        []const u8 => try arrayList(thimg, allocator),
+        else => @compileError("unsupported type: " ++ @typeName(@TypeOf(thimg))),
+    };
+}
+
 pub fn serialize(comptime T: type, real: T, allocator: s.mem.Allocator) !s.ArrayList(u8) {
-    return switch (@typeInfo(T)) {
-        .Bool => arrayList(&[_]u8{if (@as(bool, real)) 0x1 else 0x0}, allocator),
-        .Int, .Float => arrayList(s.mem.asBytes(&real), allocator),
+    return try toArrayList(switch (@typeInfo(T)) {
+        .Bool => &[_]u8{if (@as(bool, real)) 0x1 else 0x0},
+        .Int, .Float => s.mem.asBytes(&real),
         else => switch (T) {
             (vi.VarI32) => vi.VarI32.serialize(@as(vi.VarI32, real), allocator),
             (vi.VarI64) => vi.VarI64.serialize(@as(vi.VarI64, real), allocator),
             else => {
                 if (@hasDecl(T, "zcSerialize")) {
-                    return try real.zcSerialize(real, allocator);
+                    return try real.zcSerialize(allocator);
                 } else @compileError("unsupported type!");
             },
         },
-    };
+    }, allocator);
 }
 
 pub const DeserializeError = error{InvalidData};

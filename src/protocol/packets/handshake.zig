@@ -1,5 +1,26 @@
+pub const Handshake = packed struct {
+    /// The protocol version of the client that is trying to connect.
+    protocol_version: VarI32,
+    /// The next state that the client is trying to achieve
+    next_state: NextState,
+
+    pub fn zcSerialize(self: @This(), allocator: base.Allocator) ![]u8 {
+        var result: []u8 = try allocator.alloc(u8, self.protocol_version.calculateLength() + @sizeOf(NextState));
+        const protocol_version: *[VarI32.length]u8 = (try self.protocol_version.serialize(allocator)).items[0..VarI32.length];
+        mem.copy(u8, result[0..protocol_version.len], protocol_version);
+        mem.copy(u8, result[protocol_version.len .. protocol_version.len + @sizeOf(NextState)], &[1]u8{@enumToInt(self.next_state)});
+
+        return result;
+    }
+
+    pub fn zcDeserialize(data: []const u8) !@This() {
+        const protocol_version = try VarI32.deserialize(data);
+    }
+};
+
+const mem = @import("std").mem;
 const base = @import("../base.zig");
-const helpers = @import("../helpers.zig");
+const VarI32 = @import("../varint.zig").VarI32;
 
 pub const NextState = enum(u2) {
     status = 1,
@@ -20,5 +41,3 @@ pub const NextState = enum(u2) {
         };
     }
 };
-
-pub const Handshake = helpers.Packet(struct { protocol_version: base.VarI32, next_state: NextState });

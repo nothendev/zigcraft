@@ -1,9 +1,11 @@
 const s = @import("std");
 const p = @import("./protocol.zig");
+const handshake = @import("./protocol/packets/handshake.zig");
 const expect = s.testing.expect;
 
 pub fn main() !void {}
 
+// void testSerialize<T>(T thing, byte[] result);
 fn testSerialize(comptime T: type, thing: T, result: []const u8) !void {
     s.debug.print("\ntesting (de)serialization of {s};\nreceived: {any};\nresult should be {s}\n", .{ @typeName(T), thing, s.fmt.fmtSliceHexLower(result) });
     var serialized = try p.serialize(T, thing, s.testing.allocator);
@@ -22,4 +24,5 @@ test "types serialize correctly" {
     try testSerialize(p.VarI64, p.VarI64.init(127), &[_]u8{0x7f});
     try testSerialize(p.VarI64, p.VarI64.init(128), &[_]u8{ 0x80, 0x01 });
     try testSerialize(p.VarI64, p.VarI64.init(-9223372036854775808), &[_]u8{ 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01 });
+    try testSerialize(handshake.Handshake, handshake.Handshake{ .protocol_version = p.VarI32.init(763), .next_state = handshake.NextState.login }, &[_]u8{});
 }

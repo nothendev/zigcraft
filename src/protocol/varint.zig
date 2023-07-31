@@ -23,11 +23,13 @@ fn VarInt(comptime T: type) type {
 
     return packed struct {
         value: T,
+        len: usize,
 
         const Self = @This();
+        pub const max_length: comptime_int = if (T == i32) 5 else 6;
 
         pub fn init(value: T) Self {
-            return .{ .value = value };
+            return .{ .value = value, .len = _calculateLength(value) };
         }
 
         const segment_bits: T = 0x7F;
@@ -37,7 +39,6 @@ fn VarInt(comptime T: type) type {
             var value: T = 0;
             var position: (if (T == i32) u5 else u6) = 0;
             for (slc) |current_byte| {
-                s.debug.print("heh {} {} >>= {}\n", .{ value, position, current_byte });
                 value |= s.math.shl(T, current_byte & @intCast(u8, segment_bits), position);
                 if ((current_byte & @intCast(u8, continue_bit)) == 0) break;
                 position += 7;
@@ -69,6 +70,28 @@ fn VarInt(comptime T: type) type {
             return Self{
                 .value = try deserializeInner(buffer),
             };
+        }
+
+        pub fn calculateLength(self: *const Self) usize {
+            return _calculateLength(self.value);
+        }
+
+        pub fn _calculateLength(_value: T) usize {
+            var value = _value;
+            var result: usize = 0;
+
+            while (true) {
+                if ((value & ~segment_bits) == 0) {
+                    result += 1;
+                    break;
+                }
+
+                result += 1;
+
+                value = unsignedRightShift(T, value, 7);
+            }
+
+            return result;
         }
     };
 }
