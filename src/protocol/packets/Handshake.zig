@@ -5,6 +5,8 @@ next_state: NextState,
 
 const Self = @This();
 
+pub const packet_id: VarI32 = VarI32.init(0x00);
+
 pub fn zcSerialize(self: Self, allocator: base.Allocator) ![]u8 {
     const protocol_version: []const u8 = try self.protocol_version.serialize(allocator);
     // why

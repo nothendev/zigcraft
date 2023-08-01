@@ -27,6 +27,7 @@ fn VarInt(comptime T: type) type {
 
         const Self = @This();
         pub const max_length: comptime_int = if (T == i32) 5 else 6;
+        pub const zero: Self = .{ .value = 0, .len = 1 };
 
         pub fn init(value: T) Self {
             return .{ .value = value, .len = _calculateLength(value) };
