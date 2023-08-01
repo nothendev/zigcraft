@@ -10,24 +10,34 @@ fn arrayList(fal: []const u8, allocator: s.mem.Allocator) !s.ArrayList(u8) {
 }
 
 pub fn toArrayList(thimg: anytype, allocator: s.mem.Allocator) !s.ArrayList(u8) {
-    return switch (@TypeOf(thimg)) {
+    const T: type = @TypeOf(thimg);
+    var thing: T = thimg;
+    return switch (T) {
         s.ArrayList(u8) => thimg,
         []u8 => s.ArrayList(u8).fromOwnedSlice(allocator, thimg),
         []const u8 => try arrayList(thimg, allocator),
-        else => @compileError("unsupported type: " ++ @typeName(@TypeOf(thimg))),
+        u8 => wut: {
+            var al = s.ArrayList(u8).init(allocator);
+            try al.append(thimg);
+            break :wut al;
+        },
+        else => switch (@typeInfo(T)) {
+            .Array => s.ArrayList(u8).fromOwnedSlice(allocator, &thing),
+            .Pointer => |ptr| if (@typeInfo(ptr.child) == .Array) try arrayList(thing, allocator),
+            else => @compileError("unsupported type: " ++ @typeName(T)),
+        },
     };
 }
 
 pub fn serialize(comptime T: type, real: T, allocator: s.mem.Allocator) !s.ArrayList(u8) {
     return try toArrayList(switch (@typeInfo(T)) {
-        .Bool => &[_]u8{if (@as(bool, real)) 0x1 else 0x0},
+        .Bool => @as(u8, if (@as(bool, real)) 0x1 else 0x0),
         .Int, .Float => s.mem.asBytes(&real),
         else => switch (T) {
-            (vi.VarI32) => vi.VarI32.serialize(@as(vi.VarI32, real), allocator),
-            (vi.VarI64) => vi.VarI64.serialize(@as(vi.VarI64, real), allocator),
-            else => {
+            vi.VarI32, vi.VarI64 => |varint| try varint.serialize(real, allocator),
+            else => wut: {
                 if (@hasDecl(T, "zcSerialize")) {
-                    return try real.zcSerialize(allocator);
+                    break :wut try real.zcSerialize(allocator);
                 } else @compileError("unsupported type!");
             },
         },
@@ -44,7 +54,7 @@ pub fn deserialize(comptime T: type, data: []const u8, allocator: s.mem.Allocato
             0x1 => true,
             else => DeserializeError.InvalidData,
         },
-        .Int, .Float => s.mem.bytesAsValue(T, data[0..@sizeOf(T)]).*,
+        .Int, .Float => @ptrCast(*const T, data[0..@sizeOf(T)]).*,
         else => switch (T) {
             vi.VarI32, vi.VarI64 => |varint| {
                 return try varint.deserialize(bytes);

@@ -35,30 +35,18 @@ fn VarInt(comptime T: type) type {
         const segment_bits: T = 0x7F;
         const continue_bit: T = 0x80;
 
-        fn deserializeInner(slc: []const u8) !T {
-            var value: T = 0;
-            var position: (if (T == i32) u5 else u6) = 0;
-            for (slc) |current_byte| {
-                value |= s.math.shl(T, current_byte & @intCast(u8, segment_bits), position);
-                if ((current_byte & @intCast(u8, continue_bit)) == 0) break;
-                position += 7;
-
-                if (position >= (if (T == i32) 32 else 64)) return error.VarIntTooBig;
-            }
-            return value;
-        }
-
-        pub fn serialize(self: Self, allocator: s.mem.Allocator) !s.ArrayList(u8) {
+        pub fn serialize(self: Self, allocator: s.mem.Allocator) ![]u8 {
             var value = self.value;
-            var result = s.ArrayList(u8).init(allocator);
+            var result = try allocator.alloc(u8, self.len);
 
-            while (true) {
+            var i: usize = 0;
+            while (i <= self.len) : (i += 1) {
                 if ((value & ~segment_bits) == 0) {
-                    try result.append(@intCast(u8, value));
+                    result[i] = @intCast(u8, value);
                     break;
                 }
 
-                try result.append(@intCast(u8, (value & segment_bits) | continue_bit));
+                result[i] = @intCast(u8, (value & segment_bits) | continue_bit);
 
                 value = unsignedRightShift(T, value, 7);
             }
@@ -67,9 +55,18 @@ fn VarInt(comptime T: type) type {
         }
 
         pub fn deserialize(buffer: []const u8) !Self {
-            return Self{
-                .value = try deserializeInner(buffer),
-            };
+            var value: T = 0;
+            var position: (if (T == i32) u5 else u6) = 0;
+            var len: usize = 0;
+            for (buffer) |current_byte| {
+                len += 1;
+                value |= s.math.shl(T, current_byte & @intCast(u8, segment_bits), position);
+                if ((current_byte & @intCast(u8, continue_bit)) == 0) break;
+                position += 7;
+
+                if (position >= (if (T == i32) 32 else 64)) return error.VarIntTooBig;
+            }
+            return Self{ .value = value, .len = len };
         }
 
         pub fn calculateLength(self: *const Self) usize {
