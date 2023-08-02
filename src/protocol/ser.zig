@@ -54,7 +54,7 @@ pub fn deserialize(comptime T: type, data: []const u8, allocator: s.mem.Allocato
             0x1 => true,
             else => DeserializeError.InvalidData,
         },
-        .Int, .Float => @ptrCast(*const T, data[0..@sizeOf(T)]).*,
+        .Int, .Float => @as(*const T, @ptrCast(data[0..@sizeOf(T)])).*,
         else => switch (T) {
             vi.VarI32, vi.VarI64 => |varint| {
                 return try varint.deserialize(bytes);

@@ -3,6 +3,8 @@ const p = @import("./protocol.zig");
 const Handshake = @import("./protocol/packets/Handshake.zig");
 const expect = s.testing.expect;
 
+pub const io_mode = .evented;
+
 pub fn main() !void {}
 
 // void testSerialize<T>(T thing, byte[] result);
@@ -10,7 +12,7 @@ fn testSerialize(comptime T: type, thing: T, result: []const u8) !void {
     s.debug.print("\ntesting (de)serialization of {s};\nreceived: {any};\nresult should be {s}\n", .{ @typeName(T), thing, s.fmt.fmtSliceHexLower(result) });
     var serialized = try p.serialize(T, thing, s.testing.allocator);
     defer serialized.deinit();
-    try s.testing.expect(s.mem.eql(u8, result, serialized.items));
+    try s.testing.expectEqualSlices(u8, result, serialized.items);
     s.debug.print("\nserialized: {s}\n", .{s.fmt.fmtSliceHexLower(serialized.items)});
     var deserialized = try p.deserialize(T, result, s.testing.allocator);
     try s.testing.expectEqualDeep(thing, deserialized);

@@ -12,13 +12,13 @@ pub fn zcSerialize(self: Self, allocator: base.Allocator) ![]u8 {
     // why
     defer allocator.free(protocol_version);
 
-    return mem.concat(allocator, u8, &[_][]const u8{ protocol_version, &[_]u8{@enumToInt(self.next_state)} });
+    return mem.concat(allocator, u8, &[_][]const u8{ protocol_version, &[_]u8{@intFromEnum(self.next_state)} });
 }
 
 pub fn zcDeserialize(data: []const u8, _allocator: base.Allocator) !Self {
     _ = _allocator;
     const protocol_version = try VarI32.deserialize(data);
-    const next_state = @intToEnum(NextState, @ptrCast(*const u2, data[protocol_version.len .. protocol_version.len + 1]).*);
+    const next_state: NextState = @enumFromInt(@as(*const u2, @ptrCast(data[protocol_version.len .. protocol_version.len + 1])).*);
     return Self{ .protocol_version = protocol_version, .next_state = next_state };
 }
 

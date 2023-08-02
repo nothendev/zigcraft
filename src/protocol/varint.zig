@@ -6,10 +6,10 @@ pub const VarI64 = VarInt(i64);
 pub fn unsignedRightShift(comptime T: type, x: T, y: anytype) T {
     switch (@typeInfo(T)) {
         .Int => |int| {
-            return @bitCast(T, @bitCast(@Type(.{ .Int = .{
+            return @as(T, @bitCast(@as(@Type(.{ .Int = .{
                 .bits = int.bits,
                 .signedness = .unsigned,
-            } }), x) >> y);
+            } }), @bitCast(x)) >> y));
         },
         else => @compileError("non int"),
     }
@@ -43,11 +43,11 @@ fn VarInt(comptime T: type) type {
             var i: usize = 0;
             while (i <= self.len) : (i += 1) {
                 if ((value & ~segment_bits) == 0) {
-                    result[i] = @intCast(u8, value);
+                    result[i] = @intCast(value);
                     break;
                 }
 
-                result[i] = @intCast(u8, (value & segment_bits) | continue_bit);
+                result[i] = @intCast((value & segment_bits) | continue_bit);
 
                 value = unsignedRightShift(T, value, 7);
             }
@@ -61,8 +61,8 @@ fn VarInt(comptime T: type) type {
             var len: usize = 0;
             for (buffer) |current_byte| {
                 len += 1;
-                value |= s.math.shl(T, current_byte & @intCast(u8, segment_bits), position);
-                if ((current_byte & @intCast(u8, continue_bit)) == 0) break;
+                value |= s.math.shl(T, current_byte & @as(u8, @intCast(segment_bits)), position);
+                if ((current_byte & @as(u8, @intCast(continue_bit))) == 0) break;
                 position += 7;
 
                 if (position >= (if (T == i32) 32 else 64)) return error.VarIntTooBig;
