@@ -7,7 +7,7 @@ pub fn Channel(comptime T: type) type {
         inner: Rc,
 
         const SelfChannel = @This();
-        const Rc = rc.Rc(ev.Locked(ev.Channel(T)), rc.Atomic);
+        pub const Rc = rc.Rc(ev.Locked(ev.Channel(T)), rc.Atomic);
 
         pub const RecvHalf = struct {
             parent: Rc,
