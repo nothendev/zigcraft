@@ -1,6 +1,6 @@
 const s = @import("std");
 const p = @import("./protocol.zig");
-const Handshake = @import("./protocol/packets/Handshake.zig");
+const packets = @import("protocol/packets.zig");
 const expect = s.testing.expect;
 
 pub const io_mode = .evented;
@@ -25,8 +25,8 @@ fn testSerialize(comptime T: type, thing: T, result: []const u8) !void {
 }
 
 test "types serialize correctly" {
-    const handshake = Handshake{ .protocol_version = p.VarI32.init(763), .next_state = Handshake.NextState.login };
-    var handshake_serialized = try p.SerializedPacket.Uncompressed.fromPacket(Handshake, handshake, s.testing.allocator);
+    const handshake = packets.Handshake{ .protocol_version = p.VarI32.init(763), .next_state = packets.Handshake.NextState.login };
+    var handshake_serialized = try packets.SerializedPacket.Uncompressed.fromPacket(packets.Handshake, handshake, s.testing.allocator);
     defer handshake_serialized.deinitialize(s.testing.allocator);
     try testSerialize(bool, true, &[_]u8{0x1});
     try testSerialize(u8, 0x17, &[_]u8{0x17});
@@ -36,6 +36,6 @@ test "types serialize correctly" {
     try testSerialize(p.VarI64, p.VarI64.init(127), &[_]u8{0x7f});
     try testSerialize(p.VarI64, p.VarI64.init(128), &[_]u8{ 0x80, 0x01 });
     try testSerialize(p.VarI64, p.VarI64.init(-9223372036854775808), &[_]u8{ 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01 });
-    try testSerialize(Handshake, handshake, &[_]u8{ 0xfb, 0x05, 0x02 });
-    try testSerialize(p.SerializedPacket.Uncompressed, handshake_serialized, &[_]u8{ 0x04, 0x00, 0xfb, 0x05, 0x02 });
+    try testSerialize(packets.Handshake, handshake, &[_]u8{ 0xfb, 0x05, 0x02 });
+    try testSerialize(packets.SerializedPacket.Uncompressed, handshake_serialized, &[_]u8{ 0x04, 0x00, 0xfb, 0x05, 0x02 });
 }
