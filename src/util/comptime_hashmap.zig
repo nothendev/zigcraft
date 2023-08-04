@@ -76,9 +76,11 @@ pub fn ComptimeHashMap(comptime K: type, comptime V: type, comptime hash: fn (ke
         }
         unreachable; // put into a full map
     }
+    const ent = slots;
+    const max_distance = max_distance_from_start_index;
 
     return struct {
-        const entries = slots;
+        const entries = ent;
 
         pub fn has(key: K) bool {
             return get(key) != null;
@@ -88,7 +90,7 @@ pub fn ComptimeHashMap(comptime K: type, comptime V: type, comptime hash: fn (ke
             const start_index = @as(usize, hash(key)) & (size - 1);
             {
                 var roll_over: usize = 0;
-                while (roll_over <= max_distance_from_start_index) : (roll_over += 1) {
+                while (roll_over <= max_distance) : (roll_over += 1) {
                     const index = (start_index + roll_over) & (size - 1);
                     const entry = &entries[index];
 

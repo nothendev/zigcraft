@@ -7,7 +7,7 @@ const Runtime = @import("util/Runtime.zig");
 
 pub const ServerInner = struct { players: s.AutoArrayHashMap(s.net.Address, ev.RwLocked(NetPlayer)), stream: s.net.StreamServer };
 pub const Server = ev.RwLocked(ServerInner);
-pub const NetPlayer = struct { conn: ev.Locked(s.net.StreamServer.Connection), packets: Packets, state: b.State };
+pub const NetPlayer = struct { conn: s.net.StreamServer.Connection, packets: Packets, state: b.State };
 pub const Packets = struct { clientbound: chan.Channel(packets.PacketClientbound).SendHalf, serverbound: chan.Channel(packets.PacketServerbound).RecvHalf };
 
 pub fn serverLifecycle(rt: *Runtime, server_lock: *Server, allocator: s.mem.Allocator) !void {
@@ -26,12 +26,12 @@ pub fn serverLifecycle(rt: *Runtime, server_lock: *Server, allocator: s.mem.Allo
 }
 
 fn netLifecycle(rt: *Runtime, net: *ev.RwLocked(NetPlayer), clientbound: chan.Channel(packets.PacketClientbound).Rc, serverbound: chan.Channel(packets.PacketServerbound).Rc, allocator: s.mem.Allocator) !void {
-    rt.spawn(handleClientbound, .{ &net.conn, .{ .parent = clientbound }, allocator });
-    rt.spawn(handleServerbound, .{ &net.conn, .{ .parent = serverbound }, allocator });
-    rt.spawn(loginSequence, .{ net, .{ .parent = clientbound.strongClone() }, .{ .parent = serverbound.strongClone() } })
+    rt.spawn(handleClientbound, .{ net, .{ .parent = clientbound }, allocator });
+    rt.spawn(handleServerbound, .{ net, .{ .parent = serverbound }, allocator });
+    rt.spawn(loginSequence, .{ net, .{ .parent = clientbound.strongClone() }, .{ .parent = serverbound.strongClone() } });
 }
 
-fn handleClientbound(socket: *ev.Locked(s.net.StreamServer.Connection), channel: chan.Channel(packets.PacketClientbound).RecvHalf) !void {
+fn handleClientbound(socket: *ev.RwLocked(s.net.StreamServer.Connection), channel: chan.Channel(packets.PacketClientbound).RecvHalf) !void {
     // TODO no op as there are no clientbound packets right now
     _ = socket;
     while (await channel.recv()) |packet| {
