@@ -2,11 +2,11 @@ const std = @import("std");
 const builtin = @import("builtin");
 const ThreadPool = @import("thread_pool.zig");
 
-thread_pool: ThreadPool = undefined,
+/// Global thread pool which mimics other async runtimes
+var thread_pool: ThreadPool = undefined;
 
 /// Global allocator which mimics other async runtimes
-allocator: std.mem.Allocator = undefined,
-const SelfRuntime = @This();
+pub var allocator: std.mem.Allocator = undefined;
 
 /// Zig async wrapper around ThreadPool.Task
 const Task = struct {
@@ -18,9 +18,9 @@ const Task = struct {
         resume task.frame;
     }
 
-    fn schedule(self: *Task, rt: *SelfRuntime) void {
+    fn schedule(self: *Task) void {
         const batch = ThreadPool.Batch.from(&self.tp_task);
-        rt.thread_pool.schedule(batch);
+        thread_pool.schedule(batch);
     }
 };
 
@@ -31,7 +31,7 @@ fn ReturnTypeOf(comptime asyncFn: anytype) type {
 /// Entry point for the synchronous main() to an async function.
 /// Initializes the global thread pool and allocator
 /// then calls asyncFn(...args) in the thread pool and returns the results.
-pub fn run(self: *SelfRuntime, comptime asyncFn: anytype, args: anytype) ReturnTypeOf(asyncFn) {
+pub fn run(comptime asyncFn: anytype, args: anytype) ReturnTypeOf(asyncFn) {
     const Args = @TypeOf(args);
     const Wrapper = struct {
         fn entry(task: *Task, fn_args: Args) ReturnTypeOf(asyncFn) {
@@ -42,7 +42,7 @@ pub fn run(self: *SelfRuntime, comptime asyncFn: anytype, args: anytype) ReturnT
             }
 
             // Begin teardown of the thread pool after the entry point async fn completes.
-            defer self.thread_pool.shutdown();
+            defer thread_pool.shutdown();
 
             // Run the entry point async fn
             return @call(.{}, asyncFn, fn_args);
@@ -59,20 +59,20 @@ pub fn run(self: *SelfRuntime, comptime asyncFn: anytype, args: anytype) ReturnT
     if (is_windows) {
         win_heap = @TypeOf(win_heap).init();
         win_heap.heap_handle = std.os.windows.kernel32.GetProcessHeap() orelse unreachable;
-        self.allocator = win_heap.allocator;
+        allocator = win_heap.allocator;
     } else if (builtin.link_libc) {
-        self.allocator = std.heap.c_allocator;
+        allocator = std.heap.c_allocator;
     } else {
         @compileError("link to libc with '-Dc' as zig stdlib doesn't provide a fast, libc-less, general purpose allocator (yet)");
     }
 
     const num_cpus = std.Thread.getCpuCount() catch @panic("failed to get cpu core count");
     const num_threads = std.math.cast(u16, num_cpus) catch std.math.maxInt(u16);
-    self.thread_pool = ThreadPool.init(.{ .max_threads = num_threads });
+    thread_pool = ThreadPool.init(.{ .max_threads = num_threads });
 
     // Schedule the task onto the thread pool and wait for the thread pool to be shutdown() by the task.
     task.schedule();
-    self.thread_pool.deinit();
+    thread_pool.deinit();
 
     // At this point, all threads in the pool should not be running async tasks
     // so the main task/frame has been completed.
@@ -173,7 +173,7 @@ pub fn JoinHandle(comptime T: type) type {
 
 /// Dynamically allocates and runs an async function concurrently to the caller.
 /// Returns a handle to the async function which can be used to wait for its result or detach it as a dependency.
-pub fn spawn(self: *SelfRuntime, comptime asyncFn: anytype, args: anytype) JoinHandle(ReturnTypeOf(asyncFn)) {
+pub fn spawn(comptime asyncFn: anytype, args: anytype) JoinHandle(ReturnTypeOf(asyncFn)) {
     const Args = @TypeOf(args);
     const Result = ReturnTypeOf(asyncFn);
     const Wrapper = struct {
@@ -202,12 +202,12 @@ pub fn spawn(self: *SelfRuntime, comptime asyncFn: anytype, args: anytype) JoinH
             // This also means that any `await`er would block indefinitely,
             // but that's fine since we're using a custom method with SpawnHandle instead of await to get the value.
             suspend {
-                self.allocator.destroy(@frame());
+                allocator.destroy(@frame());
             }
         }
     };
 
-    const frame = self.allocator.create(@Frame(Wrapper.entry)) catch @panic("failed to allocate coroutine");
+    const frame = allocator.create(@Frame(Wrapper.entry)) catch @panic("failed to allocate coroutine");
     var spawn_handle: *SpawnHandle(Result) = undefined;
     frame.* = async Wrapper.entry(&spawn_handle, args);
     return JoinHandle(Result){ .spawn_handle = spawn_handle };

@@ -156,7 +156,7 @@ pub const NonAtomic = struct {
     /// Saturating increment
     inline fn increment(ptr: *T) T {
         const val = ptr.*;
-        if (@addWithOverflow(T, val, 1, ptr)) {
+        if (@addWithOverflow(val, 1)) {
             ptr.* = MAX;
         }
         return val;
@@ -168,7 +168,7 @@ pub const NonAtomic = struct {
         if (val == MIN) {
             return MIN;
         }
-        if (@addWithOverflow(T, val, 1, ptr)) {
+        if (@addWithOverflow(val, 1)) {
             ptr.* = MAX;
         }
         return val;
@@ -177,7 +177,7 @@ pub const NonAtomic = struct {
     /// Saturating decrement
     inline fn decrement(ptr: *T) T {
         const val = ptr.*;
-        if (@subWithOverflow(T, val, 1, ptr)) {
+        if (@subWithOverflow(val, 1).@"1" != 0) {
             ptr.* = MIN;
         }
         return val;
